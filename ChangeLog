@@ -1,3 +1,8 @@
+2026-07-19 version 0.11.0
+* ExecuteCDPCommand for Chrome DevTools Protocol via ChromeDriver
+* Optional browser GitHub Actions workflow (workflow_dispatch + weekly)
+* Smoke test asserts Browser.getVersion over CDP
+
 2026-07-19 version 0.10.8
 * README: modern ChromeDriver/Selenium 4 usage, behavior notes, v0.10.7 migrate
 * Examples: ExampleChromeDriver and Example_selenium4 (root URL, no /wd/hub)

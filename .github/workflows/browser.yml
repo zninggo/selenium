@@ -1,0 +1,68 @@
+name: browser
+
+# Optional integration job: download Chrome for Testing + run smoke.
+# Does not run on every PR — trigger manually or via schedule.
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly Monday 03:17 UTC (off the hour)
+    - cron: "17 3 * * 1"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb unzip ca-certificates fonts-liberation libnss3 libatk-bridge2.0-0 \
+            libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+            libasound2t64 || sudo apt-get install -y --no-install-recommends \
+            xvfb unzip ca-certificates fonts-liberation libnss3 libatk-bridge2.0-0 \
+            libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+            libasound2
+
+      - name: download Chrome for Testing + chromedriver
+        working-directory: vendor
+        run: go run -mod=mod init.go --alsologtostderr --download_browsers=true --download_latest=false
+
+      - name: locate binaries
+        id: bins
+        run: |
+          set -euo pipefail
+          CHROME=""
+          for c in vendor/chrome-linux/chrome vendor/chrome-linux64/chrome; do
+            if [ -f "$c" ]; then CHROME=$c; break; fi
+          done
+          if [ -z "$CHROME" ]; then
+            CHROME=$(find vendor -type f -name chrome 2>/dev/null | head -1 || true)
+          fi
+          DRIVER=""
+          for d in vendor/chromedriver vendor/chromedriver-linux64/chromedriver; do
+            if [ -f "$d" ]; then DRIVER=$d; break; fi
+          done
+          if [ -z "$DRIVER" ]; then
+            DRIVER=$(find vendor -type f -name chromedriver 2>/dev/null | head -1 || true)
+          fi
+          chmod +x "$CHROME" "$DRIVER" || true
+          echo "chrome=${CHROME}" >> "$GITHUB_OUTPUT"
+          echo "driver=${DRIVER}" >> "$GITHUB_OUTPUT"
+          echo "Chrome: ${CHROME}"
+          echo "Driver: ${DRIVER}"
+          test -n "${CHROME}" && test -f "${CHROME}"
+          test -n "${DRIVER}" && test -f "${DRIVER}"
+
+      - name: TestSmokeChrome
+        run: |
+          go test -mod=mod -count=1 -timeout=10m -v -run TestSmokeChrome \
+            -chrome_binary="${{ steps.bins.outputs.chrome }}" \
+            -chrome_driver_path="${{ steps.bins.outputs.driver }}" \
+            -headless=true

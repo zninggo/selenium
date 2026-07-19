@@ -5,8 +5,8 @@
 | **Module** | `github.com/zninggo/selenium` |
 | **Upstream** | [tebeka/selenium](https://github.com/tebeka/selenium) (largely unmaintained since ~2021) |
 | **Status** | Self-use first; public best-effort |
-| **Latest** | `v0.10.7` |
-| **Notable delta** | ChromeDriver 115+ / W3C find & SendKeys / Selenium 4 service / HTTP reliability / multi-OS driver download / smoke test |
+| **Latest** | `v0.11.0` |
+| **Notable delta** | ChromeDriver 115+ / W3C find & SendKeys / Selenium 4 service / CDP / HTTP reliability / multi-OS driver download / smoke + optional browser CI |
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/zninggo/selenium.svg)](https://pkg.go.dev/github.com/zninggo/selenium)
 [![CI](https://github.com/zninggo/selenium/actions/workflows/ci.yml/badge.svg)](https://github.com/zninggo/selenium/actions/workflows/ci.yml)
@@ -35,7 +35,7 @@ Requires **Go 1.22+** and a working WebDriver stack (browser + driver, or Seleni
 ### Migrating from tebeka/selenium
 
 1. Rewrite imports: `github.com/tebeka/selenium` → `github.com/zninggo/selenium`
-2. `go get github.com/zninggo/selenium@v0.10.7`
+2. `go get github.com/zninggo/selenium@v0.11.0`
 3. `go mod tidy`
 
 ## Quick start (recommended)
@@ -129,6 +129,7 @@ See the original `Example` in [example_test.go](example_test.go).
 | W3C SendKeys | Sends both `text` and `value` string list |
 | Service debug | Selenium 3 `-debug` only when `SetDebug(true)` |
 | Linux teardown | Process group + `Pdeathsig` to reduce orphan drivers |
+| CDP | `ExecuteCDPCommand(cmd, params)` via ChromeDriver `goog/cdp/execute` |
 
 ## Downloading Dependencies
 
@@ -183,7 +184,7 @@ No longer supported.
 1. [Headless Chrome does not support running extensions](https://crbug.com/706008).
 2. Use the **root** service URL with ChromeDriver 115+ (not `/wd/hub`).
 
-## Changelog (0.10.x summary)
+## Changelog (summary)
 
 | Version | Highlights |
 |---------|------------|
@@ -195,13 +196,20 @@ No longer supported.
 | v0.10.5 | Content-Type, W3C SendKeys value list, cookie omitempty, gated `-debug` |
 | v0.10.6 | `TestSmokeChrome`; ChromeDriver tests without `/wd/hub` |
 | v0.10.7 | Smoke read-back via `GetProperty` on headless CI |
+| v0.10.8 | README modern usage; `ExampleChromeDriver` / `Example_selenium4` |
+| v0.11.0 | `ExecuteCDPCommand`; optional `browser` workflow |
 
 Full notes: [ChangeLog](ChangeLog) and [Releases](https://github.com/zninggo/selenium/releases).
 
+### Optional browser CI
+
+Manually run (or weekly schedule) the **browser** workflow:
+Actions → browser → Run workflow.
+It downloads Chrome for Testing and runs `TestSmokeChrome` (including CDP).
+
 ### Optional next
 
-1. Optional browser integration CI (`workflow_dispatch`)
-2. Feature PRs (CDP, Shadow DOM, Print, Select helpers, remote file upload)
+1. Feature PRs (Shadow DOM, Print, Select helpers, remote file upload)
 
 ## Breaking Changes (historical)
 

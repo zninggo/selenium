@@ -205,4 +205,19 @@ func TestSmokeChrome(t *testing.T) {
 	if title != "smoke" {
 		t.Fatalf("Title = %q, want smoke", title)
 	}
+
+	// CDP via ChromeDriver (goog/cdp/execute).
+	ver, err := wd.ExecuteCDPCommand("Browser.getVersion", nil)
+	if err != nil {
+		t.Fatalf("ExecuteCDPCommand(Browser.getVersion): %v", err)
+	}
+	vm, ok := ver.(map[string]interface{})
+	if !ok || vm["product"] == nil {
+		t.Fatalf("Browser.getVersion unexpected result: %#v", ver)
+	}
+	product, _ := vm["product"].(string)
+	if product == "" {
+		t.Fatalf("Browser.getVersion empty product: %#v", ver)
+	}
+	t.Logf("CDP Browser.getVersion product=%s", product)
 }

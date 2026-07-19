@@ -424,6 +424,13 @@ type WebDriver interface {
 	// perform JSON decoding.
 	ExecuteScriptAsyncRaw(script string, args []interface{}) ([]byte, error)
 
+	// ExecuteCDPCommand runs a Chrome DevTools Protocol command via ChromeDriver
+	// (POST /session/{id}/goog/cdp/execute). cmd is a CDP method name such as
+	// "Browser.getVersion"; params may be nil or a map/struct JSON-encoded as
+	// the CDP params object. The decoded "value" field is returned.
+	// Only supported with Chrome/Chromium driven by ChromeDriver.
+	ExecuteCDPCommand(cmd string, params interface{}) (interface{}, error)
+
 	// WaitWithTimeoutAndInterval waits for the condition to evaluate to true.
 	WaitWithTimeoutAndInterval(condition Condition, timeout, interval time.Duration) error
 

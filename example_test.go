@@ -254,3 +254,33 @@ func Example_selenium4() {
 	}
 	fmt.Println(title)
 }
+
+// Example_cdp shows ExecuteCDPCommand with ChromeDriver (Browser.getVersion).
+func Example_cdp() {
+	const (
+		chromeDriverPath = "chromedriver"
+		port             = 9515
+	)
+	svc, err := selenium.NewChromeDriverService(chromeDriverPath, port)
+	if err != nil {
+		panic(err)
+	}
+	defer svc.Stop()
+
+	caps := selenium.Capabilities{"browserName": "chrome"}
+	caps.AddChrome(chrome.Capabilities{
+		Args: []string{"--headless=new", "--no-sandbox"},
+		W3C:  true,
+	})
+	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://127.0.0.1:%d", port))
+	if err != nil {
+		panic(err)
+	}
+	defer wd.Quit()
+
+	res, err := wd.ExecuteCDPCommand("Browser.getVersion", nil)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%v\n", res)
+}

@@ -1282,6 +1282,30 @@ func (wd *remoteWD) ExecuteScriptAsyncRaw(script string, args []interface{}) ([]
 	return wd.execScriptRaw(script, args, "/async")
 }
 
+// ExecuteCDPCommand runs a Chrome DevTools Protocol method through ChromeDriver.
+// See https://chromedevtools.github.io/devtools-protocol/
+func (wd *remoteWD) ExecuteCDPCommand(cmd string, params interface{}) (interface{}, error) {
+	if params == nil {
+		params = map[string]interface{}{}
+	}
+	data, err := json.Marshal(map[string]interface{}{
+		"cmd":    cmd,
+		"params": params,
+	})
+	if err != nil {
+		return nil, err
+	}
+	response, err := wd.execute("POST", wd.requestURL("/session/%s/goog/cdp/execute", wd.id), data)
+	if err != nil {
+		return nil, err
+	}
+	reply := new(struct{ Value interface{} })
+	if err := json.Unmarshal(response, reply); err != nil {
+		return nil, err
+	}
+	return reply.Value, nil
+}
+
 func (wd *remoteWD) Screenshot() ([]byte, error) {
 	data, err := wd.stringCommand("/session/%s/screenshot")
 	if err != nil {
