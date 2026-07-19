@@ -72,6 +72,11 @@ func newRequest(method string, url string, data []byte) (*http.Request, error) {
 		return nil, err
 	}
 	request.Header.Add("Accept", jsonContentType)
+	// Some remote ends (e.g. WinAppDriver, older Selenium) reject requests
+	// without an explicit JSON Content-Type even when a body is present.
+	if len(data) > 0 {
+		request.Header.Set("Content-Type", jsonContentType)
+	}
 
 	return request, nil
 }
@@ -921,7 +926,7 @@ type cookie struct {
 	Secure   bool        `json:"secure"`
 	Expiry   interface{} `json:"expiry"`
 	HTTPOnly bool        `json:"httpOnly"`
-	SameSite string      `json:"sameSite",omitempty`
+	SameSite string      `json:"sameSite,omitempty"`
 }
 
 func (c cookie) sanitize() Cookie {
@@ -1389,14 +1394,20 @@ func (elem *remoteWE) SendKeys(keys string) error {
 }
 
 func (wd *remoteWD) processKeyString(keys string) interface{} {
+	// Build the legacy/JSON Wire "value" array of single-character strings.
+	// Several ChromeDriver versions require "value" to be a list even in W3C
+	// mode (see tebeka/selenium#199); the W3C field is "text".
+	chars := make([]string, 0, len(keys))
+	for _, c := range keys {
+		chars = append(chars, string(c))
+	}
 	if !wd.w3cCompatible {
-		chars := make([]string, len(keys))
-		for i, c := range keys {
-			chars[i] = string(c)
-		}
 		return map[string][]string{"value": chars}
 	}
-	return map[string]string{"text": keys}
+	return map[string]interface{}{
+		"text":  keys,
+		"value": chars,
+	}
 }
 
 func (elem *remoteWE) TagName() (string, error) {

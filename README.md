@@ -106,10 +106,12 @@ Done:
 - v0.10.2: `ByClassName`/`ByName` W3C locator mapping, `NewSeleniumServiceV4`
 - v0.10.3: Linux process-group + Pdeathsig orphan cleanup for service/Xvfb/Sauce Connect
 - v0.10.4: multi-OS `vendor/init.go` + Chrome for Testing
+- v0.10.5: Content-Type header, W3C SendKeys value list, cookie omitempty, service -debug gated
 
-Still open (self-use priority):
+Still open (optional / not must-fix):
 
 1. Optional browser integration CI
+2. Feature PRs (CDP, Shadow DOM, Print, Select helpers, file upload)
 
 ## Breaking Changes
 

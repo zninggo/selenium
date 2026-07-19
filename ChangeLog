@@ -1,3 +1,10 @@
+2026-07-19 version 0.10.5
+* Set Content-Type: application/json on requests with a body (PR #153/#274)
+* SendKeys in W3C mode sends both text and value[] (issue #199)
+* Cookie Path/Domain/Secure/HTTPOnly omitempty (PR #283)
+* Fix internal cookie sameSite JSON tag
+* NewSeleniumService only passes -debug when SetDebug(true) (issue #193)
+
 2026-07-19 version 0.10.4
 * vendor/init.go: multi-OS asset selection (linux/mac/windows)
 * Chrome downloads via Chrome for Testing Stable API (not ancient GCS snapshots)

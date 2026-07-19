@@ -188,7 +188,14 @@ func NewSeleniumService(jarPath string, port int, opts ...ServiceOption) (*Servi
 	}
 	classpath = append(classpath, jarPath)
 	s.cmd.Args = append(s.cmd.Args, "-cp", strings.Join(classpath, ":"))
-	s.cmd.Args = append(s.cmd.Args, "org.openqa.grid.selenium.GridLauncherV3", "-port", strconv.Itoa(port), "-debug")
+	// Only pass -debug when client debug logging is enabled so credentials
+	// and other sensitive data are not written to service logs by default
+	// (tebeka/selenium#193).
+	launcherArgs := []string{"org.openqa.grid.selenium.GridLauncherV3", "-port", strconv.Itoa(port)}
+	if debugFlag {
+		launcherArgs = append(launcherArgs, "-debug")
+	}
+	s.cmd.Args = append(s.cmd.Args, launcherArgs...)
 
 	if err := s.start(port); err != nil {
 		return nil, err

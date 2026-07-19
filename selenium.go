@@ -204,14 +204,16 @@ type Size struct {
 }
 
 // Cookie represents an HTTP cookie.
+// Optional fields use omitempty so remote ends can apply their defaults
+// instead of receiving zero values (tebeka/selenium#130, #282, PR #283).
 type Cookie struct {
 	Name     string   `json:"name"`
 	Value    string   `json:"value"`
-	Path     string   `json:"path"`
-	Domain   string   `json:"domain"`
-	Secure   bool     `json:"secure"`
+	Path     string   `json:"path,omitempty"`
+	Domain   string   `json:"domain,omitempty"`
+	Secure   bool     `json:"secure,omitempty"`
 	Expiry   uint     `json:"expiry,omitempty"`
-	HTTPOnly bool     `json:"httpOnly"`
+	HTTPOnly bool     `json:"httpOnly,omitempty"`
 	SameSite SameSite `json:"sameSite,omitempty"`
 }
 
