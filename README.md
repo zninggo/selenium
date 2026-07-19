@@ -107,10 +107,21 @@ Done:
 - v0.10.3: Linux process-group + Pdeathsig orphan cleanup for service/Xvfb/Sauce Connect
 - v0.10.4: multi-OS `vendor/init.go` + Chrome for Testing
 - v0.10.5: Content-Type header, W3C SendKeys value list, cookie omitempty, service -debug gated
+- v0.10.6: `TestSmokeChrome` main-path smoke (skips without ChromeDriver); ChromeDriver test URL without `/wd/hub`
+
+### Smoke test (optional, needs Chrome + ChromeDriver)
+
+```text
+# download drivers (Linux/mac/windows per GOOS)
+cd vendor && go run init.go --alsologtostderr --download_browsers && cd ..
+go test -mod=mod -count=1 -timeout=5m -run TestSmokeChrome -v
+```
+
+Without `chromedriver` / Chrome the smoke test skips (default CI stays green).
 
 Still open (optional / not must-fix):
 
-1. Optional browser integration CI
+1. Optional browser integration CI workflow
 2. Feature PRs (CDP, Shadow DOM, Print, Select helpers, file upload)
 
 ## Breaking Changes

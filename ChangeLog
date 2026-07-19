@@ -1,3 +1,7 @@
+2026-07-19 version 0.10.6
+* Add TestSmokeChrome main-path regression (skip without ChromeDriver)
+* Fix ChromeDriver direct tests to use root URL, not /wd/hub
+
 2026-07-19 version 0.10.5
 * Set Content-Type: application/json on requests with a body (PR #153/#274)
 * SendKeys in W3C mode sends both text and value[] (issue #199)

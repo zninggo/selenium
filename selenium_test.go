@@ -152,13 +152,16 @@ func runChromeTests(t *testing.T, c seleniumtest.Config) {
 	if err != nil {
 		t.Fatalf("pickUnusedPort() returned error: %v", err)
 	}
-	c.Addr = fmt.Sprintf("http://127.0.0.1:%d/wd/hub", port)
 
 	var s *selenium.Service
 	if c.SeleniumVersion.Major == 3 {
+		// Selenium 3 hub listens under /wd/hub.
+		c.Addr = fmt.Sprintf("http://127.0.0.1:%d/wd/hub", port)
 		c.ServiceOptions = append(c.ServiceOptions, selenium.ChromeDriver(*chromeDriverPath))
 		s, err = selenium.NewSeleniumService(*selenium3Path, port, c.ServiceOptions...)
 	} else {
+		// ChromeDriver (especially 115+) serves sessions at the root, not /wd/hub.
+		c.Addr = fmt.Sprintf("http://127.0.0.1:%d", port)
 		s, err = selenium.NewChromeDriverService(*chromeDriverPath, port, c.ServiceOptions...)
 	}
 	if err != nil {
