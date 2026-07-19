@@ -1,3 +1,7 @@
+2026-07-19 version 0.10.8
+* README: modern ChromeDriver/Selenium 4 usage, behavior notes, v0.10.7 migrate
+* Examples: ExampleChromeDriver and Example_selenium4 (root URL, no /wd/hub)
+
 2026-07-19 version 0.10.7
 * Smoke test reads input via GetProperty after SendKeys (CI headless Chrome)
 

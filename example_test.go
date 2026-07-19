@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zninggo/selenium"
+	"github.com/zninggo/selenium/chrome"
 )
 
 // This example shows how to navigate to a http://play.golang.org page, input a
@@ -170,4 +171,86 @@ func Example() {
 		panic(err)
 	}
 
+}
+
+// ExampleChromeDriver shows the recommended setup for ChromeDriver 115+.
+//
+// ChromeDriver serves the WebDriver endpoints at the server root — do not use
+// the Selenium 3 "/wd/hub" suffix.
+//
+// To run this example:
+//
+//  1. Install chromedriver (or: cd vendor && go run init.go --download_browsers).
+//  2. Copy into a main package, or run via go test after providing Output.
+//  3. go test -mod=mod -run ExampleChromeDriver -v
+func ExampleChromeDriver() {
+	const (
+		// Paths differ on each machine; "chromedriver" works if it is on PATH.
+		chromeDriverPath = "chromedriver"
+		port             = 9515
+	)
+
+	svc, err := selenium.NewChromeDriverService(chromeDriverPath, port)
+	if err != nil {
+		panic(err)
+	}
+	defer svc.Stop()
+
+	caps := selenium.Capabilities{"browserName": "chrome"}
+	caps.AddChrome(chrome.Capabilities{
+		Args: []string{"--headless=new", "--no-sandbox", "--disable-dev-shm-usage"},
+		W3C:  true,
+	})
+
+	// Root URL — not http://127.0.0.1:9515/wd/hub
+	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://127.0.0.1:%d", port))
+	if err != nil {
+		panic(err)
+	}
+	defer wd.Quit()
+
+	if err := wd.Get("https://golang.org"); err != nil {
+		panic(err)
+	}
+	title, err := wd.Title()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(title)
+}
+
+// Example_selenium4 shows how to start Selenium Server 4.x and connect without
+// the legacy "/wd/hub" prefix.
+//
+// To run this example you need a selenium-server-4.x.jar and Java installed.
+func Example_selenium4() {
+	const (
+		// Download from https://www.selenium.dev/downloads/ or via vendor/init.go
+		// with --download_latest (writes selenium-server-4.jar when available).
+		selenium4Path = "vendor/selenium-server-4.jar"
+		port          = 4444
+	)
+
+	svc, err := selenium.NewSeleniumServiceV4(selenium4Path, port)
+	if err != nil {
+		panic(err)
+	}
+	defer svc.Stop()
+
+	caps := selenium.Capabilities{"browserName": "chrome"}
+	// Selenium 4 standalone listens at the root path.
+	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://127.0.0.1:%d", port))
+	if err != nil {
+		panic(err)
+	}
+	defer wd.Quit()
+
+	if err := wd.Get("https://golang.org"); err != nil {
+		panic(err)
+	}
+	title, err := wd.Title()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(title)
 }
