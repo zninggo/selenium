@@ -160,7 +160,7 @@ func executeCommand(method, url string, data []byte) (json.RawMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("got content type header %q, expected %q", fullCType, jsonContentType)
 	}
-	if cType != jsonContentType {
+	if cType != jsonContentType && cType != "text/plain" {
 		return nil, fmt.Errorf("got content type %q, expected %q", cType, jsonContentType)
 	}
 
@@ -420,15 +420,16 @@ func (wd *remoteWD) NewSession() (string, error) {
 	attempts := []struct {
 		params map[string]interface{}
 	}{
+		// W3C format (ChromeDriver 115+)
+		{map[string]interface{}{
+			"capabilities": newW3CCapabilities(wd.capabilities),
+		}},
+		// W3C + legacy
 		{map[string]interface{}{
 			"capabilities":        newW3CCapabilities(wd.capabilities),
 			"desiredCapabilities": wd.capabilities,
 		}},
-		{map[string]interface{}{
-			"capabilities": map[string]interface{}{
-				"desiredCapabilities": wd.capabilities,
-			},
-		}},
+		// Legacy only
 		{map[string]interface{}{
 			"desiredCapabilities": wd.capabilities,
 		}}}
@@ -441,6 +442,9 @@ func (wd *remoteWD) NewSession() (string, error) {
 
 		response, err := wd.execute("POST", wd.requestURL("/session"), data)
 		if err != nil {
+			if i < len(attempts)-1 {
+				continue
+			}
 			return "", err
 		}
 

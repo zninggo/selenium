@@ -196,8 +196,8 @@ func NewSeleniumService(jarPath string, port int, opts ...ServiceOption) (*Servi
 
 // NewChromeDriverService starts a ChromeDriver instance in the background.
 func NewChromeDriverService(path string, port int, opts ...ServiceOption) (*Service, error) {
-	cmd := exec.Command(path, "--port="+strconv.Itoa(port), "--url-base=wd/hub", "--verbose")
-	s, err := newService(cmd, "/wd/hub", port, opts...)
+	cmd := exec.Command(path, "--port="+strconv.Itoa(port))
+	s, err := newService(cmd, "", port, opts...)
 	if err != nil {
 		return nil, err
 	}
