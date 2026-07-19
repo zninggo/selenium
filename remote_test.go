@@ -24,3 +24,23 @@ func TestCookieExpiryOmitempty(t *testing.T) {
 		t.Fatalf("non-zero Expiry should be present, got %s", b)
 	}
 }
+
+func TestW3CFindStrategy(t *testing.T) {
+	tests := []struct {
+		by, value, wantBy, wantValue string
+	}{
+		{ByID, "login", ByCSSSelector, "#login"},
+		{ByName, "q", ByCSSSelector, `[name="q"]`},
+		{ByClassName, "btn-primary", ByCSSSelector, `[class~="btn-primary"]`},
+		{ByCSSSelector, ".keep", ByCSSSelector, ".keep"},
+		{ByXPATH, "//div", ByXPATH, "//div"},
+		{ByTagName, "input", ByTagName, "input"},
+	}
+	for _, tc := range tests {
+		gotBy, gotValue := w3cFindStrategy(tc.by, tc.value)
+		if gotBy != tc.wantBy || gotValue != tc.wantValue {
+			t.Errorf("w3cFindStrategy(%q, %q) = (%q, %q), want (%q, %q)",
+				tc.by, tc.value, gotBy, gotValue, tc.wantBy, tc.wantValue)
+		}
+	}
+}

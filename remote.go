@@ -656,19 +656,28 @@ func (wd *remoteWD) PageSource() (string, error) {
 	return wd.stringCommand("/session/%s/source")
 }
 
+// w3cFindStrategy maps legacy JSON Wire locator strategies that W3C WebDriver
+// dropped (id, name, class name) onto CSS selectors.
+func w3cFindStrategy(by, value string) (string, string) {
+	switch by {
+	case ByID:
+		return ByCSSSelector, "#" + value
+	case ByName:
+		return ByCSSSelector, fmt.Sprintf("[name=%q]", value)
+	case ByClassName:
+		// class~= matches a whitespace-separated class token without needing
+		// CSS identifier escaping for most class names.
+		return ByCSSSelector, fmt.Sprintf("[class~=%q]", value)
+	default:
+		return by, value
+	}
+}
+
 func (wd *remoteWD) find(by, value, suffix, url string) ([]byte, error) {
-	// The W3C specification removed the specific ID and Name locator strategies,
-	// instead only providing a CSS-based strategy. Emulate the old behavior to
-	// maintain API compatibility.
+	// The W3C specification removed the specific ID, Name, and Class Name
+	// locator strategies. Emulate the old behavior to maintain API compatibility.
 	if wd.w3cCompatible {
-		switch by {
-		case ByID:
-			by = ByCSSSelector
-			value = "#" + value
-		case ByName:
-			by = ByCSSSelector
-			value = fmt.Sprintf("input[name=%q]", value)
-		}
+		by, value = w3cFindStrategy(by, value)
 	}
 
 	params := map[string]string{

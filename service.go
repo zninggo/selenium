@@ -106,7 +106,7 @@ func Output(w io.Writer) ServiceOption {
 // GeckoDriver sets the path to the geckodriver binary for the Selenium Server.
 // Unlike other drivers, Selenium Server does not support specifying the
 // geckodriver path at runtime. This ServiceOption is only useful when calling
-// NewSeleniumService.
+// NewSeleniumService or NewSeleniumServiceV4.
 func GeckoDriver(path string) ServiceOption {
 	return func(s *Service) error {
 		s.geckoDriverPath = path
@@ -115,7 +115,7 @@ func GeckoDriver(path string) ServiceOption {
 }
 
 // ChromeDriver sets the path for Chromedriver for the Selenium Server.  This
-// ServiceOption is only useful when calling NewSeleniumService.
+// ServiceOption is only useful when calling NewSeleniumService or NewSeleniumServiceV4.
 func ChromeDriver(path string) ServiceOption {
 	return func(s *Service) error {
 		s.chromeDriverPath = path
@@ -164,7 +164,9 @@ func (s Service) FrameBuffer() *FrameBuffer {
 	return s.xvfb
 }
 
-// NewSeleniumService starts a Selenium instance in the background.
+// NewSeleniumService starts a Selenium 3 instance in the background.
+// The service listens under /wd/hub (e.g. http://localhost:<port>/wd/hub).
+// For Selenium 4+, use NewSeleniumServiceV4.
 func NewSeleniumService(jarPath string, port int, opts ...ServiceOption) (*Service, error) {
 	s, err := newService(exec.Command("java"), "/wd/hub", port, opts...)
 	if err != nil {
@@ -187,6 +189,35 @@ func NewSeleniumService(jarPath string, port int, opts ...ServiceOption) (*Servi
 	classpath = append(classpath, jarPath)
 	s.cmd.Args = append(s.cmd.Args, "-cp", strings.Join(classpath, ":"))
 	s.cmd.Args = append(s.cmd.Args, "org.openqa.grid.selenium.GridLauncherV3", "-port", strconv.Itoa(port), "-debug")
+
+	if err := s.start(port); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// NewSeleniumServiceV4 starts a Selenium 4+ standalone server in the background.
+// jarPath should be a selenium-server-4.x (or newer) jar.
+// The service listens at the root path (e.g. http://localhost:<port>), not /wd/hub.
+// Pass that URL to NewRemote as the urlPrefix.
+func NewSeleniumServiceV4(jarPath string, port int, opts ...ServiceOption) (*Service, error) {
+	s, err := newService(exec.Command("java"), "", port, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if s.javaPath != "" {
+		s.cmd.Path = s.javaPath
+	}
+
+	args := []string{"java"}
+	if s.geckoDriverPath != "" {
+		args = append(args, "-Dwebdriver.gecko.driver="+s.geckoDriverPath)
+	}
+	if s.chromeDriverPath != "" {
+		args = append(args, "-Dwebdriver.chrome.driver="+s.chromeDriverPath)
+	}
+	args = append(args, "-jar", jarPath, "standalone", "--port", strconv.Itoa(port))
+	s.cmd.Args = args
 
 	if err := s.start(port); err != nil {
 		return nil, err

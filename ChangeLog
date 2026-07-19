@@ -1,3 +1,7 @@
+2026-07-19 version 0.10.2
+* W3C find maps ByClassName to CSS [class~=...]; ByName to [name=...]
+* NewSeleniumServiceV4 for Selenium 4+ standalone (root URL, not /wd/hub)
+
 2026-07-19 version 0.10.1
 * Close HTTP response body in executeCommand (connection leak)
 * Default HTTPClient Timeout 120s; timed clients for service status/shutdown

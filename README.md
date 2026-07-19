@@ -99,15 +99,15 @@ No longer supported.
 
 ## Backlog
 
-Done in v0.10.1: response body Close, HTTPClient timeout, service shutdown Kill fallback, CurrentURL nil-safe, Cookie.Expiry omitempty.
+Done:
+- v0.10.1: response body Close, HTTPClient timeout, service shutdown Kill fallback, CurrentURL nil-safe, Cookie.Expiry omitempty
+- v0.10.2: `ByClassName`/`ByName` W3C locator mapping, `NewSeleniumServiceV4`
 
 Still open (self-use priority):
 
 1. Broader process-group / Pdeathsig orphan cleanup
-2. `ByClassName` W3C locator mapping
-3. Selenium 4 service helper
-4. Multi-OS modern binary download in `vendor/init.go`
-5. Optional browser integration CI
+2. Multi-OS modern binary download in `vendor/init.go`
+3. Optional browser integration CI
 
 ## Breaking Changes
 
