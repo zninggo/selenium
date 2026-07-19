@@ -284,3 +284,35 @@ func Example_cdp() {
 	}
 	fmt.Printf("%v\n", res)
 }
+
+// Example_shadowDOM finds a control inside an open shadow root.
+func Example_shadowDOM() {
+	const (
+		chromeDriverPath = "chromedriver"
+		port             = 9515
+	)
+	svc, err := selenium.NewChromeDriverService(chromeDriverPath, port)
+	if err != nil {
+		panic(err)
+	}
+	defer svc.Stop()
+
+	caps := selenium.Capabilities{"browserName": "chrome"}
+	caps.AddChrome(chrome.Capabilities{
+		Args: []string{"--headless=new", "--no-sandbox"},
+		W3C:  true,
+	})
+	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://127.0.0.1:%d", port))
+	if err != nil {
+		panic(err)
+	}
+	defer wd.Quit()
+
+	// Serve a page with declarative open Shadow DOM, or open a site that uses it.
+	// host is the light-DOM host; GetShadowRoot reaches inside.
+	// host, _ := wd.FindElement(selenium.ByID, "host")
+	// root, _ := host.GetShadowRoot()
+	// btn, _ := root.FindElement(selenium.ByID, "inner-btn")
+	// btn.Click()
+	fmt.Println("use GetShadowRoot on the host element, then FindElement inside")
+}

@@ -1,3 +1,8 @@
+2026-07-19 version 0.12.0
+* Shadow DOM: WebElement.GetShadowRoot and ShadowRoot.FindElement(s)
+* iframe already supported via SwitchFrame (documented)
+* Smoke + seleniumtest cover open declarative shadow roots on Chrome
+
 2026-07-19 version 0.11.1
 * Add Chinese README (README.zh-CN.md) and language switcher links
 

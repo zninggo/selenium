@@ -220,4 +220,51 @@ func TestSmokeChrome(t *testing.T) {
 		t.Fatalf("Browser.getVersion empty product: %#v", ver)
 	}
 	t.Logf("CDP Browser.getVersion product=%s", product)
+
+	// Shadow DOM (open root): find host → shadow root → inner control.
+	const shadowPage = `<!DOCTYPE html>
+<html><head><title>smoke-shadow</title></head>
+<body>
+  <div id="host">
+    <template shadowrootmode="open">
+      <button id="inner-btn" class="deep">Inside Shadow</button>
+    </template>
+  </div>
+</body></html>`
+	hsShadow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(shadowPage))
+	}))
+	defer hsShadow.Close()
+
+	if err := wd.Get(hsShadow.URL); err != nil {
+		t.Fatalf("Get(shadow page): %v", err)
+	}
+	host, err := wd.FindElement(selenium.ByID, "host")
+	if err != nil {
+		t.Fatalf("FindElement(host): %v", err)
+	}
+	// Plain CSS must not see inside open shadow without piercing.
+	if _, err := wd.FindElement(selenium.ByID, "inner-btn"); err == nil {
+		t.Fatal("expected FindElement(inner-btn) from light DOM to fail")
+	}
+	root, err := host.GetShadowRoot()
+	if err != nil {
+		t.Fatalf("GetShadowRoot: %v", err)
+	}
+	inner, err := root.FindElement(selenium.ByID, "inner-btn")
+	if err != nil {
+		t.Fatalf("shadow FindElement(inner-btn): %v", err)
+	}
+	innerText, err := inner.Text()
+	if err != nil {
+		t.Fatalf("inner Text: %v", err)
+	}
+	if innerText != "Inside Shadow" {
+		t.Fatalf("inner text = %q, want Inside Shadow", innerText)
+	}
+	if err := inner.Click(); err != nil {
+		t.Fatalf("inner Click: %v", err)
+	}
+	t.Log("Shadow DOM: host → GetShadowRoot → FindElement/Click OK")
 }

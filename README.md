@@ -7,8 +7,8 @@
 | **Module** | `github.com/zninggo/selenium` |
 | **Upstream** | [tebeka/selenium](https://github.com/tebeka/selenium) (largely unmaintained since ~2021) |
 | **Status** | Self-use first; public best-effort |
-| **Latest** | `v0.11.1` |
-| **Notable delta** | ChromeDriver 115+ / W3C find & SendKeys / Selenium 4 service / CDP / HTTP reliability / multi-OS driver download / smoke + optional browser CI |
+| **Latest** | `v0.12.0` |
+| **Notable delta** | ChromeDriver 115+ / W3C find & SendKeys / Selenium 4 / CDP / Shadow DOM / HTTP reliability / multi-OS drivers / smoke + browser CI |
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/zninggo/selenium.svg)](https://pkg.go.dev/github.com/zninggo/selenium)
 [![CI](https://github.com/zninggo/selenium/actions/workflows/ci.yml/badge.svg)](https://github.com/zninggo/selenium/actions/workflows/ci.yml)
@@ -37,7 +37,7 @@ Requires **Go 1.22+** and a working WebDriver stack (browser + driver, or Seleni
 ### Migrating from tebeka/selenium
 
 1. Rewrite imports: `github.com/tebeka/selenium` → `github.com/zninggo/selenium`
-2. `go get github.com/zninggo/selenium@v0.11.1`
+2. `go get github.com/zninggo/selenium@v0.12.0`
 3. `go mod tidy`
 
 ## Quick start (recommended)
@@ -120,6 +120,20 @@ See the original `Example` in [example_test.go](example_test.go).
 | Selenium 4 | `NewSeleniumServiceV4` | `http://127.0.0.1:<port>` |
 | Selenium 3 | `NewSeleniumService` | `http://127.0.0.1:<port>/wd/hub` |
 
+## Shadow DOM vs iframe
+
+- **iframe**: separate document — use `SwitchFrame` (already supported).
+- **Shadow DOM**: component internal tree on the same page — use `host.GetShadowRoot()` then find inside the returned `ShadowRoot`.
+
+```go
+host, err := wd.FindElement(selenium.ByID, "host")
+root, err := host.GetShadowRoot()
+btn, err := root.FindElement(selenium.ByID, "inner-btn")
+btn.Click()
+```
+
+Only **open** shadow roots are accessible (W3C / ChromeDriver).
+
 ## Behavior notes (this fork)
 
 | Topic | Behavior |
@@ -132,6 +146,8 @@ See the original `Example` in [example_test.go](example_test.go).
 | Service debug | Selenium 3 `-debug` only when `SetDebug(true)` |
 | Linux teardown | Process group + `Pdeathsig` to reduce orphan drivers |
 | CDP | `ExecuteCDPCommand(cmd, params)` via ChromeDriver `goog/cdp/execute` |
+| Shadow DOM | `elem.GetShadowRoot()` then `root.FindElement` / `FindElements` (open roots) |
+| iframe | Already supported via `SwitchFrame` |
 
 ## Downloading Dependencies
 
@@ -201,6 +217,7 @@ No longer supported.
 | v0.10.8 | README modern usage; `ExampleChromeDriver` / `Example_selenium4` |
 | v0.11.0 | `ExecuteCDPCommand`; optional `browser` workflow |
 | v0.11.1 | Chinese README (`README.zh-CN.md`) + language switcher |
+| v0.12.0 | Shadow DOM: `GetShadowRoot` + find inside open shadow roots |
 
 Full notes: [ChangeLog](ChangeLog) and [Releases](https://github.com/zninggo/selenium/releases).
 
@@ -212,7 +229,7 @@ It downloads Chrome for Testing and runs `TestSmokeChrome` (including CDP).
 
 ### Optional next
 
-1. Feature PRs (Shadow DOM, Print, Select helpers, remote file upload)
+1. Feature PRs (Print, Select helpers, remote file upload)
 
 ## Breaking Changes (historical)
 

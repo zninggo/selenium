@@ -7,8 +7,8 @@
 | **模块路径** | `github.com/zninggo/selenium` |
 | **上游仓库** | [tebeka/selenium](https://github.com/tebeka/selenium)（约 2021 年后基本停更） |
 | **状态** | 先自用，公开 best-effort |
-| **当前版本** | `v0.11.1` |
-| **相对上游的主要差异** | ChromeDriver 115+ / W3C 定位与 SendKeys / Selenium 4 服务 / CDP / HTTP 可靠性 / 多平台驱动下载 / smoke 与可选浏览器 CI |
+| **当前版本** | `v0.12.0` |
+| **相对上游的主要差异** | ChromeDriver 115+ / W3C 定位与 SendKeys / Selenium 4 / CDP / Shadow DOM / HTTP 可靠性 / 多平台驱动 / smoke 与浏览器 CI |
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/zninggo/selenium.svg)](https://pkg.go.dev/github.com/zninggo/selenium)
 [![CI](https://github.com/zninggo/selenium/actions/workflows/ci.yml/badge.svg)](https://github.com/zninggo/selenium/actions/workflows/ci.yml)
@@ -34,7 +34,7 @@ go get github.com/zninggo/selenium@latest
 ### 从 tebeka/selenium 迁移
 
 1. 修改 import：`github.com/tebeka/selenium` → `github.com/zninggo/selenium`
-2. `go get github.com/zninggo/selenium@v0.11.1`
+2. `go get github.com/zninggo/selenium@v0.12.0`
 3. `go mod tidy`
 
 ## 快速开始（推荐）
@@ -117,6 +117,20 @@ wd, err := selenium.NewRemote(caps, "http://127.0.0.1:4444/wd/hub")
 | Selenium 4 | `NewSeleniumServiceV4` | `http://127.0.0.1:<port>` |
 | Selenium 3 | `NewSeleniumService` | `http://127.0.0.1:<port>/wd/hub` |
 
+## Shadow DOM 与 iframe
+
+- **iframe**：嵌套的另一份文档 —— 使用已有的 `SwitchFrame`。
+- **Shadow DOM**：同一页里组件内部的隔离树 —— 使用 `host.GetShadowRoot()`，再在返回的 `ShadowRoot` 里查找。
+
+```go
+host, err := wd.FindElement(selenium.ByID, "host")
+root, err := host.GetShadowRoot()
+btn, err := root.FindElement(selenium.ByID, "inner-btn")
+btn.Click()
+```
+
+仅 **open** 的 shadow root 可访问（W3C / ChromeDriver）。
+
 ## 本 fork 行为说明
 
 | 主题 | 行为 |
@@ -129,6 +143,8 @@ wd, err := selenium.NewRemote(caps, "http://127.0.0.1:4444/wd/hub")
 | 服务调试 | 仅当 `SetDebug(true)` 时，Selenium 3 才加 `-debug` |
 | Linux 清理 | 进程组 + `Pdeathsig`，减少孤儿 driver 进程 |
 | CDP | `ExecuteCDPCommand(cmd, params)`，经 ChromeDriver `goog/cdp/execute` |
+| Shadow DOM | `elem.GetShadowRoot()`，再在 root 上 `FindElement` / `FindElements`（仅 open） |
+| iframe | 已支持：`SwitchFrame` |
 
 ## 下载依赖（测试用）
 
@@ -209,7 +225,7 @@ Actions → browser → Run workflow。
 
 ### 可选后续
 
-1. 功能类 PR（Shadow DOM、Print、Select 封装、远程文件上传）
+1. 功能类 PR（Print、Select 封装、远程文件上传）
 
 ## 历史破坏性变更
 

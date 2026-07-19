@@ -138,6 +138,7 @@ func RunCommonTests(t *testing.T, c Config) {
 	t.Run("PageSource", runTest(testPageSource, c))
 	t.Run("FindElement", runTest(testFindElement, c))
 	t.Run("FindElements", runTest(testFindElements, c))
+	t.Run("ShadowDOM", runTest(testShadowDOM, c))
 	t.Run("SendKeys", runTest(testSendKeys, c))
 	t.Run("Click", runTest(testClick, c))
 	t.Run("GetCookies", runTest(testGetCookies, c))
@@ -565,6 +566,45 @@ func testFindElements(t *testing.T, c Config) {
 	}
 
 	evaluateElement(t, wd, elems[0])
+}
+
+func testShadowDOM(t *testing.T, c Config) {
+	if c.Browser == "htmlunit" {
+		t.Skip("Shadow DOM is not supported on HTMLUnit")
+	}
+	wd := newRemote(t, newTestCapabilities(t, c), c)
+	defer quitRemote(t, wd)
+
+	if err := wd.Get(c.ServerURL + "/shadow"); err != nil {
+		t.Fatalf("wd.Get(%q) returned error: %v", c.ServerURL+"/shadow", err)
+	}
+
+	host, err := wd.FindElement(selenium.ByID, "host-element")
+	if err != nil {
+		t.Fatalf("FindElement(host-element): %v", err)
+	}
+	root, err := host.GetShadowRoot()
+	if err != nil {
+		t.Fatalf("GetShadowRoot: %v", err)
+	}
+	btn, err := root.FindElement(selenium.ByID, "shadow-button")
+	if err != nil {
+		t.Fatalf("shadow FindElement(shadow-button): %v", err)
+	}
+	text, err := btn.Text()
+	if err != nil {
+		t.Fatalf("shadow button Text: %v", err)
+	}
+	if text != "Shadow Click" {
+		t.Fatalf("shadow button text = %q, want Shadow Click", text)
+	}
+	btns, err := root.FindElements(selenium.ByCSSSelector, "button")
+	if err != nil {
+		t.Fatalf("shadow FindElements(button): %v", err)
+	}
+	if len(btns) != 2 {
+		t.Fatalf("shadow buttons = %d, want 2", len(btns))
+	}
 }
 
 func testSendKeys(t *testing.T, c Config) {
@@ -1604,6 +1644,26 @@ var alertPage = `
 </html>
 `
 
+// shadowDOMPage uses declarative Shadow DOM (shadowrootmode=open) so modern
+// Chromium attaches an open shadow root without custom-element JS.
+var shadowDOMPage = `
+<html>
+<head>
+	<title>Go Selenium Test Suite - Shadow DOM</title>
+</head>
+<body>
+	<div id="outside">outside</div>
+	<div id="host-element">
+		<template shadowrootmode="open">
+			<button id="shadow-button">Shadow Click</button>
+			<button id="another-shadow-button">Other</button>
+			<span class="label">inside-shadow</span>
+		</template>
+	</div>
+</body>
+</html>
+`
+
 var Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	page, ok := map[string]string{
@@ -1614,6 +1674,7 @@ var Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		"/frame":  framePage,
 		"/title":  titleChangePage,
 		"/alert":  alertPage,
+		"/shadow": shadowDOMPage,
 	}[path]
 	if !ok {
 		http.NotFound(w, r)

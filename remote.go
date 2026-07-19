@@ -726,7 +726,55 @@ const (
 	// webElementIdentifier is the string constant defined by the W3C
 	// specification that is the key for the map that contains a unique element identifier.
 	webElementIdentifier = "element-6066-11e4-a52e-4f735466cecf"
+
+	// shadowRootIdentifier is the W3C key for a shadow root reference in a value map.
+	shadowRootIdentifier = "shadow-6066-11e4-a52e-4f735466cecf"
 )
+
+func shadowRootIDFromValue(v map[string]string) string {
+	if v == nil {
+		return ""
+	}
+	if id := v[shadowRootIdentifier]; id != "" {
+		return id
+	}
+	return ""
+}
+
+func (wd *remoteWD) DecodeShadowRoot(data []byte) (ShadowRoot, error) {
+	reply := new(struct{ Value map[string]string })
+	if err := json.Unmarshal(data, &reply); err != nil {
+		return nil, err
+	}
+	id := shadowRootIDFromValue(reply.Value)
+	if id == "" {
+		return nil, fmt.Errorf("invalid shadow root returned: %+v", reply)
+	}
+	return &remoteSR{parent: wd, id: id}, nil
+}
+
+type remoteSR struct {
+	parent *remoteWD
+	id     string
+}
+
+func (sr *remoteSR) FindElement(by, value string) (WebElement, error) {
+	url := fmt.Sprintf("/session/%%s/shadow/%s/element", sr.id)
+	response, err := sr.parent.find(by, value, "", url)
+	if err != nil {
+		return nil, err
+	}
+	return sr.parent.DecodeElement(response)
+}
+
+func (sr *remoteSR) FindElements(by, value string) ([]WebElement, error) {
+	url := fmt.Sprintf("/session/%%s/shadow/%s/element", sr.id)
+	response, err := sr.parent.find(by, value, "s", url)
+	if err != nil {
+		return nil, err
+	}
+	return sr.parent.DecodeElements(response)
+}
 
 func elementIDFromValue(v map[string]string) string {
 	for _, key := range []string{webElementIdentifier, legacyWebElementIdentifier} {
@@ -1480,6 +1528,15 @@ func (elem *remoteWE) FindElements(by, value string) ([]WebElement, error) {
 	}
 
 	return elem.parent.DecodeElements(response)
+}
+
+func (elem *remoteWE) GetShadowRoot() (ShadowRoot, error) {
+	url := fmt.Sprintf("/session/%%s/element/%s/shadow", elem.id)
+	response, err := elem.parent.execute("GET", elem.parent.requestURL(url, elem.parent.id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return elem.parent.DecodeShadowRoot(response)
 }
 
 func (elem *remoteWE) boolQuery(urlTemplate string) (bool, error) {

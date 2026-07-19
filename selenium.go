@@ -457,8 +457,11 @@ type WebElement interface {
 
 	// FindElement finds a child element.
 	FindElement(by, value string) (WebElement, error)
-	// FindElement finds multiple children elements.
+	// FindElements finds multiple children elements.
 	FindElements(by, value string) ([]WebElement, error)
+	// GetShadowRoot returns the open shadow root hosted by this element (W3C).
+	// Closed shadow roots are not accessible and return an error from the driver.
+	GetShadowRoot() (ShadowRoot, error)
 
 	// TagName returns the element's name.
 	TagName() (string, error)
@@ -487,4 +490,16 @@ type WebElement interface {
 	CSSProperty(name string) (string, error)
 	// Screenshot takes a screenshot of the attribute scroll'ing if necessary.
 	Screenshot(scroll bool) ([]byte, error)
+}
+
+// ShadowRoot is an open shadow DOM root. Find elements inside it like a
+// scoped document fragment (similar in spirit to switching into an iframe,
+// but for a component's internal tree on the same page).
+//
+// Endpoint: GET /session/{id}/element/{eid}/shadow then find under /shadow/{id}/...
+type ShadowRoot interface {
+	// FindElement finds one element within this shadow root.
+	FindElement(by, value string) (WebElement, error)
+	// FindElements finds all matching elements within this shadow root.
+	FindElements(by, value string) ([]WebElement, error)
 }
