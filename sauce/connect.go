@@ -34,7 +34,7 @@ type Connect struct {
 	// https://wiki.saucelabs.com/pages/viewpage.action?pageId=48365781
 	Args []string
 
-	// If true and the current operating system is Linux, send SIGTERM to the
+	// If true and the current operating system is Linux, send SIGKILL to the
 	// proxy process when this parent process exits.
 	QuitProcessUponExit bool
 
