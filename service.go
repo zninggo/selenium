@@ -251,9 +251,10 @@ func (s *Service) start(port int) error {
 		return err
 	}
 
+	statusClient := &http.Client{Timeout: 2 * time.Second}
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
-		resp, err := http.Get(s.addr + "/status")
+		resp, err := statusClient.Get(s.addr + "/status")
 		if err == nil {
 			resp.Body.Close()
 			switch resp.StatusCode {
@@ -277,11 +278,16 @@ func (s *Service) Stop() error {
 			return err
 		}
 	} else {
-		resp, err := http.Get(s.addr + s.shutdownURLPath)
+		shutdownClient := &http.Client{Timeout: 5 * time.Second}
+		resp, err := shutdownClient.Get(s.addr + s.shutdownURLPath)
 		if err != nil {
-			return err
+			// Fall back to Kill when the shutdown endpoint is unavailable.
+			if killErr := s.cmd.Process.Kill(); killErr != nil {
+				return fmt.Errorf("shutdown request failed: %v; kill failed: %v", err, killErr)
+			}
+		} else {
+			resp.Body.Close()
 		}
-		resp.Body.Close()
 	}
 	if err := s.cmd.Wait(); err != nil && err.Error() != "signal: killed" {
 		return err

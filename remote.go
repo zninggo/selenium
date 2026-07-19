@@ -57,8 +57,11 @@ type remoteWD struct {
 }
 
 // HTTPClient is the default client to use to communicate with the WebDriver
-// server.
-var HTTPClient = http.DefaultClient
+// server. It has a non-zero Timeout so hung remote ends do not block forever.
+// Callers may replace it with a custom *http.Client.
+var HTTPClient = &http.Client{
+	Timeout: 120 * time.Second,
+}
 
 // jsonContentType is JSON content type.
 const jsonContentType = "application/json"
@@ -139,6 +142,7 @@ func executeCommand(method, url string, data []byte) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
 	buf, err := ioutil.ReadAll(response.Body)
 	if debugFlag {
@@ -616,17 +620,7 @@ func (wd *remoteWD) WindowHandles() ([]string, error) {
 }
 
 func (wd *remoteWD) CurrentURL() (string, error) {
-	url := wd.requestURL("/session/%s/url", wd.id)
-	response, err := wd.execute("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	reply := new(struct{ Value *string })
-	if err := json.Unmarshal(response, reply); err != nil {
-		return "", err
-	}
-
-	return *reply.Value, nil
+	return wd.stringCommand("/session/%s/url")
 }
 
 func (wd *remoteWD) Get(url string) error {

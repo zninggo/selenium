@@ -210,7 +210,7 @@ type Cookie struct {
 	Path     string   `json:"path"`
 	Domain   string   `json:"domain"`
 	Secure   bool     `json:"secure"`
-	Expiry   uint     `json:"expiry"`
+	Expiry   uint     `json:"expiry,omitempty"`
 	HTTPOnly bool     `json:"httpOnly"`
 	SameSite SameSite `json:"sameSite,omitempty"`
 }

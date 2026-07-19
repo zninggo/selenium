@@ -97,19 +97,17 @@ No longer supported.
 
 1. [Headless Chrome does not support running extensions](https://crbug.com/706008).
 
-## Backlog (planned after v0.10.0)
+## Backlog
 
-Self-use priority order:
+Done in v0.10.1: response body Close, HTTPClient timeout, service shutdown Kill fallback, CurrentURL nil-safe, Cookie.Expiry omitempty.
 
-1. Close HTTP response bodies (connection leak)
-2. Default / per-session HTTP client timeout
-3. Service process teardown / orphan driver cleanup
-4. `CurrentURL` nil-value panic
-5. Cookie expiry omitempty for session cookies
-6. `ByClassName` W3C locator mapping
-7. Selenium 4 service helper
-8. Multi-OS modern binary download in `vendor/init.go`
-9. Optional browser integration CI
+Still open (self-use priority):
+
+1. Broader process-group / Pdeathsig orphan cleanup
+2. `ByClassName` W3C locator mapping
+3. Selenium 4 service helper
+4. Multi-OS modern binary download in `vendor/init.go`
+5. Optional browser integration CI
 
 ## Breaking Changes
 
