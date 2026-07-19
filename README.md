@@ -1,11 +1,13 @@
 # Selenium / WebDriver client for Go (maintained fork)
 
+**Language:** **English** | [简体中文](README.zh-CN.md)
+
 | | |
 |---|---|
 | **Module** | `github.com/zninggo/selenium` |
 | **Upstream** | [tebeka/selenium](https://github.com/tebeka/selenium) (largely unmaintained since ~2021) |
 | **Status** | Self-use first; public best-effort |
-| **Latest** | `v0.11.0` |
+| **Latest** | `v0.11.1` |
 | **Notable delta** | ChromeDriver 115+ / W3C find & SendKeys / Selenium 4 service / CDP / HTTP reliability / multi-OS driver download / smoke + optional browser CI |
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/zninggo/selenium.svg)](https://pkg.go.dev/github.com/zninggo/selenium)
@@ -35,7 +37,7 @@ Requires **Go 1.22+** and a working WebDriver stack (browser + driver, or Seleni
 ### Migrating from tebeka/selenium
 
 1. Rewrite imports: `github.com/tebeka/selenium` → `github.com/zninggo/selenium`
-2. `go get github.com/zninggo/selenium@v0.11.0`
+2. `go get github.com/zninggo/selenium@v0.11.1`
 3. `go mod tidy`
 
 ## Quick start (recommended)
@@ -198,6 +200,7 @@ No longer supported.
 | v0.10.7 | Smoke read-back via `GetProperty` on headless CI |
 | v0.10.8 | README modern usage; `ExampleChromeDriver` / `Example_selenium4` |
 | v0.11.0 | `ExecuteCDPCommand`; optional `browser` workflow |
+| v0.11.1 | Chinese README (`README.zh-CN.md`) + language switcher |
 
 Full notes: [ChangeLog](ChangeLog) and [Releases](https://github.com/zninggo/selenium/releases).
 

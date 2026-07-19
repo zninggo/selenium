@@ -1,3 +1,6 @@
+2026-07-19 version 0.11.1
+* Add Chinese README (README.zh-CN.md) and language switcher links
+
 2026-07-19 version 0.11.0
 * ExecuteCDPCommand for Chrome DevTools Protocol via ChromeDriver
 * Optional browser GitHub Actions workflow (workflow_dispatch + weekly)
