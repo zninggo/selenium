@@ -1,36 +1,42 @@
-# The most complete, best-tested WebDriver client for Go
+# Selenium / WebDriver client for Go (maintained fork)
 
-[![GoDoc](https://godoc.org/github.com/tebeka/selenium?status.svg)](https://godoc.org/github.com/tebeka/selenium)
-[![Travis](https://travis-ci.org/tebeka/selenium.svg?branch=master)](https://travis-ci.org/tebeka/selenium)
-[![Go Report Card](https://goreportcard.com/badge/github.com/tebeka/selenium)](https://goreportcard.com/report/github.com/tebeka/selenium)
+| | |
+|---|---|
+| **Module** | `github.com/zninggo/selenium` |
+| **Upstream** | [tebeka/selenium](https://github.com/tebeka/selenium) (largely unmaintained since ~2021) |
+| **Status** | Self-use first; public best-effort |
+| **Notable delta** | ChromeDriver 115+ session / URL-base compatibility |
 
-## About
+[![Go Reference](https://pkg.go.dev/badge/github.com/zninggo/selenium.svg)](https://pkg.go.dev/github.com/zninggo/selenium)
+[![CI](https://github.com/zninggo/selenium/actions/workflows/ci.yml/badge.svg)](https://github.com/zninggo/selenium/actions/workflows/ci.yml)
 
-This is a [WebDriver][selenium] client for [Go][go]. It supports the
+This is a [WebDriver][webdriver] client for [Go][go]. It supports the
 [WebDriver protocol][webdriver] and has been tested with various versions of
 [Selenium WebDriver][selenium], Firefox and [Geckodriver][geckodriver], and
-Chrome and [ChromeDriver][chromedriver],
+Chrome and [ChromeDriver][chromedriver].
 
-`selenium` is currently maintained by Eric Garrido ([@minusnine][minusnine]).
+This repository is a maintained fork of [tebeka/selenium](https://github.com/tebeka/selenium).
+Upstream commits may be cherry-picked as needed; there is no automatic merge of `upstream/master`.
 
 [selenium]: http://seleniumhq.org/
 [webdriver]: https://www.w3.org/TR/webdriver/
 [go]: http://golang.org/
-[server]: http://seleniumhq.org/download/
 [geckodriver]: https://github.com/mozilla/geckodriver
 [chromedriver]: https://sites.google.com/a/chromium.org/chromedriver/
-[minusnine]: http://github.com/minusnine
 
 ## Installing
 
-Run
+```text
+go get github.com/zninggo/selenium@latest
+```
 
-    go get -t -d github.com/tebeka/selenium
+Requires Go 1.22+ and a working WebDriver stack (browser + driver, or Selenium server).
 
-to fetch the package.
+### Migrating from tebeka/selenium
 
-The package requires a working WebDriver installation, which can include recent
-versions of a web browser being driven by Selenium WebDriver.
+1. Rewrite imports: `github.com/tebeka/selenium` → `github.com/zninggo/selenium`
+2. `go get github.com/zninggo/selenium@v0.10.0`
+3. `go mod tidy`
 
 ### Downloading Dependencies
 
@@ -38,15 +44,21 @@ We provide a means to download the ChromeDriver binary, the Firefox binary, the
 Selenium WebDriver JARs, and the Sauce Connect proxy binary. This is primarily
 intended for testing.
 
-    $ cd vendor
-    $ go run init.go --alsologtostderr  --download_browsers --download_latest
-    $ cd ..
+```text
+$ cd vendor
+$ go run init.go --alsologtostderr --download_browsers --download_latest
+$ cd ..
+```
 
 Re-run this periodically to get up-to-date versions of these binaries.
+Note: the helper currently targets Linux asset URLs.
 
 ## Documentation
 
-The API documentation is at https://godoc.org/github.com/tebeka/selenium. See [the example](https://github.com/tebeka/selenium/blob/master/example_test.go) and unit tests(for [sauce](https://github.com/tebeka/selenium/blob/master/sauce_test.go), [selenium](https://github.com/tebeka/selenium/blob/master/selenium_test.go) and [service](https://github.com/tebeka/selenium/blob/master/service_test.go)) for better usage information.
+API docs: https://pkg.go.dev/github.com/zninggo/selenium
+
+See [example_test.go](https://github.com/zninggo/selenium/blob/master/example_test.go)
+and unit tests for usage.
 
 ## Known Issues
 
@@ -58,7 +70,7 @@ intervention.
 Please feel free to [file an issue][issue] if this client doesn't work as
 expected.
 
-[issue]: https://github.com/tebeka/selenium/issues/new
+[issue]: https://github.com/zninggo/selenium/issues/new
 
 Below are known issues that affect the usage of this API. There are likely
 others filed on the respective issue trackers.
@@ -85,6 +97,20 @@ No longer supported.
 
 1. [Headless Chrome does not support running extensions](https://crbug.com/706008).
 
+## Backlog (planned after v0.10.0)
+
+Self-use priority order:
+
+1. Close HTTP response bodies (connection leak)
+2. Default / per-session HTTP client timeout
+3. Service process teardown / orphan driver cleanup
+4. `CurrentURL` nil-value panic
+5. Cookie expiry omitempty for session cookies
+6. `ByClassName` W3C locator mapping
+7. Selenium 4 service helper
+8. Multi-OS modern binary download in `vendor/init.go`
+9. Optional browser integration CI
+
 ## Breaking Changes
 
 There are a number of upcoming changes that break backward compatibility in an
@@ -102,7 +128,7 @@ a more idiomatic type.
 
 ## Hacking
 
-Patches are encouraged through GitHub pull requests. Please ensure that:
+Patches are welcome through GitHub pull requests. Please ensure that:
 
 1.  A test is added for anything more than a trivial change and that the
     existing tests pass. See below for instructions on setting up your test
@@ -114,7 +140,7 @@ Patches are encouraged through GitHub pull requests. Please ensure that:
 
 See [the issue tracker][issues] for features that need implementing.
 
-[issues]: https://github.com/tebeka/selenium/issues
+[issues]: https://github.com/zninggo/selenium/issues
 
 ### Testing Locally
 
@@ -196,4 +222,4 @@ Test results can be viewed through the
 
 This project is licensed under the [MIT][mit] license.
 
-[mit]: https://raw.githubusercontent.com/tebeka/selenium/master/LICENSE
+[mit]: https://raw.githubusercontent.com/zninggo/selenium/master/LICENSE

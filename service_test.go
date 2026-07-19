@@ -2,6 +2,7 @@ package selenium
 
 import (
 	"fmt"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -75,6 +76,9 @@ func TestIsDisplay(t *testing.T) {
 }
 
 func TestFrameBuffer(t *testing.T) {
+	if _, err := exec.LookPath("Xvfb"); err != nil {
+		t.Skip("Xvfb not found in PATH")
+	}
 	// Note on FrameBuffer and xgb.Conn:
 	// There appears to be a race condition when closing a Conn instance before
 	// a FrameBuffer instance.  A short sleep solves the problem.

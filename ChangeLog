@@ -1,3 +1,11 @@
+2026-07-19 version 0.10.0
+* Fork re-homed to github.com/zninggo/selenium
+* Go 1.22
+* GitHub Actions CI (gofmt/build/test without browsers)
+* ChromeDriver 115+ compatibility
+* Fix example Actions API to use WebDriver receivers
+* Skip TestFrameBuffer when Xvfb is missing
+
 2016-11-22 version 0.9.3
 * Pretty printing of JSON reponse (@crantok  in PR #44)
 

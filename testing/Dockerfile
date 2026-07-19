@@ -1,6 +1,6 @@
-FROM golang:1.12-buster
-MAINTAINER Eric Garrido <eric@ericgar.com>
+FROM golang:1.22-bookworm
 
-RUN apt-get update
-RUN apt-get install -y xvfb default-jre unzip chromium firefox-esr bzip2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xvfb default-jre-headless unzip chromium firefox-esr bzip2 \
+    && rm -rf /var/lib/apt/lists/*
 VOLUME /code
