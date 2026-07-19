@@ -6,9 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
-	"syscall"
 	"time"
 )
 
@@ -67,15 +65,8 @@ func (c *Connect) Start() error {
 	if c.LogFile != "" {
 		c.cmd.Args = append(c.cmd.Args, "--logfile", c.LogFile)
 	}
-	if c.QuitProcessUponExit && runtime.GOOS == "linux" {
-		c.cmd.SysProcAttr = &syscall.SysProcAttr{
-			// Deliver SIGTERM to process when we die.
-			//
-			// TODO(minusnine): Pdeathsig is only supported on Linux. Somehow, make
-			// sure process cleanup happens as gracefully as possible.
-			//
-			// Pdeathsig: syscall.SIGTERM,
-		}
+	if c.QuitProcessUponExit {
+		configureQuitOnParentExit(c.cmd)
 	}
 
 	dir, err := ioutil.TempDir("", "selenium-sauce-connect")
@@ -132,5 +123,12 @@ func (c *Connect) Addr() string {
 
 // Stop terminates the Proxy process.
 func (c *Connect) Stop() error {
-	return c.cmd.Process.Kill()
+	if c.cmd == nil || c.cmd.Process == nil {
+		return nil
+	}
+	if err := c.cmd.Process.Kill(); err != nil {
+		return err
+	}
+	_ = c.cmd.Wait()
+	return nil
 }

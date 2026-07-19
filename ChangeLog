@@ -1,3 +1,8 @@
+2026-07-19 version 0.10.3
+* Linux: service/Xvfb use process group + Pdeathsig to reduce orphan drivers
+* Service start failure kills the half-started process
+* Sauce Connect enables Pdeathsig when QuitProcessUponExit is set
+
 2026-07-19 version 0.10.2
 * W3C find maps ByClassName to CSS [class~=...]; ByName to [name=...]
 * NewSeleniumServiceV4 for Selenium 4+ standalone (root URL, not /wd/hub)

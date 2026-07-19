@@ -102,12 +102,12 @@ No longer supported.
 Done:
 - v0.10.1: response body Close, HTTPClient timeout, service shutdown Kill fallback, CurrentURL nil-safe, Cookie.Expiry omitempty
 - v0.10.2: `ByClassName`/`ByName` W3C locator mapping, `NewSeleniumServiceV4`
+- v0.10.3: Linux process-group + Pdeathsig orphan cleanup for service/Xvfb/Sauce Connect
 
 Still open (self-use priority):
 
-1. Broader process-group / Pdeathsig orphan cleanup
-2. Multi-OS modern binary download in `vendor/init.go`
-3. Optional browser integration CI
+1. Multi-OS modern binary download in `vendor/init.go`
+2. Optional browser integration CI
 
 ## Breaking Changes
 

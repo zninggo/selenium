@@ -265,8 +265,7 @@ func newService(cmd *exec.Cmd, urlPrefix string, port int, opts ...ServiceOption
 	cmd.Stderr = s.output
 	cmd.Stdout = s.output
 	cmd.Env = os.Environ()
-	// TODO(minusnine): Pdeathsig is only supported on Linux. Somehow, make sure
-	// process cleanup happens as gracefully as possible.
+	configureCmd(cmd)
 	if s.display != "" {
 		cmd.Env = append(cmd.Env, "DISPLAY=:"+s.display)
 	}
@@ -296,6 +295,9 @@ func (s *Service) start(port int) error {
 			}
 		}
 	}
+	// Failed to become ready; tear down so we do not leave orphans.
+	_ = killCmd(s.cmd)
+	_ = s.cmd.Wait()
 	return fmt.Errorf("server did not respond on port %d", port)
 }
 
@@ -305,7 +307,7 @@ func (s *Service) Stop() error {
 	// Selenium 3 stopped supporting the shutdown URL by default.
 	// https://github.com/SeleniumHQ/selenium/issues/2852
 	if s.shutdownURLPath == "" {
-		if err := s.cmd.Process.Kill(); err != nil {
+		if err := killCmd(s.cmd); err != nil {
 			return err
 		}
 	} else {
@@ -313,7 +315,7 @@ func (s *Service) Stop() error {
 		resp, err := shutdownClient.Get(s.addr + s.shutdownURLPath)
 		if err != nil {
 			// Fall back to Kill when the shutdown endpoint is unavailable.
-			if killErr := s.cmd.Process.Kill(); killErr != nil {
+			if killErr := killCmd(s.cmd); killErr != nil {
 				return fmt.Errorf("shutdown request failed: %v; kill failed: %v", err, killErr)
 			}
 		} else {
@@ -382,8 +384,7 @@ func NewFrameBufferWithOptions(options FrameBufferOptions) (*FrameBuffer, error)
 	xvfb.ExtraFiles = []*os.File{w}
 
 	// TODO(minusnine): plumb a way to set xvfb.Std{err,out} conditionally.
-	// TODO(minusnine): Pdeathsig is only supported on Linux. Somehow, make sure
-	// process cleanup happens as gracefully as possible.
+	configureCmd(xvfb)
 	xvfb.Env = append(xvfb.Env, "XAUTHORITY="+authPath)
 	if err := xvfb.Start(); err != nil {
 		return nil, err
@@ -430,7 +431,7 @@ func NewFrameBufferWithOptions(options FrameBufferOptions) (*FrameBuffer, error)
 // Stop kills the background frame buffer process and removes the X
 // authorization file.
 func (f FrameBuffer) Stop() error {
-	if err := f.cmd.Process.Kill(); err != nil {
+	if err := killCmd(f.cmd); err != nil {
 		return err
 	}
 	os.Remove(f.AuthPath) // best effort removal; ignore error
