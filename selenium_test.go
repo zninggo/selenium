@@ -217,6 +217,9 @@ func TestHTMLUnit(t *testing.T) {
 	if _, err := os.Stat(*htmlUnitDriverPath); err != nil {
 		t.Skipf("Skipping HTMLUnit tests because the HTMLUnit Driver JAR not found at path %q", *htmlUnitDriverPath)
 	}
+	if _, err := exec.LookPath("java"); err != nil {
+		t.Skip("Skipping HTMLUnit tests because java was not found in PATH")
+	}
 
 	if testing.Verbose() {
 		selenium.SetDebug(true)

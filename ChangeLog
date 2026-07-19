@@ -1,3 +1,9 @@
+2026-07-19 version 0.10.4
+* vendor/init.go: multi-OS asset selection (linux/mac/windows)
+* Chrome downloads via Chrome for Testing Stable API (not ancient GCS snapshots)
+* Firefox/geckodriver/Sauce Connect package selection by GOOS/GOARCH
+* Unsupported platforms fail clearly instead of downloading Linux-only URLs
+
 2026-07-19 version 0.10.3
 * Linux: service/Xvfb use process group + Pdeathsig to reduce orphan drivers
 * Service start failure kills the half-started process

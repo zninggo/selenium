@@ -1,6 +1,9 @@
 // Binary init downloads the necessary files to perform an integration test
 // between this WebDriver client and multiple versions of Selenium and
 // browsers.
+//
+// Asset selection is based on GOOS/GOARCH. Unsupported combinations fail with
+// a clear error instead of silently downloading Linux-only URLs.
 package main
 
 import (
@@ -9,44 +12,42 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
+	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/golang/glog"
 	"github.com/google/go-github/v27/github"
-	"google.golang.org/api/option"
 )
 
 const (
-	// desiredChromeBuild is the known build of Chromium to download from the
-	// chromium-browser-snapshots/Linux_x64 bucket.
-	//
-	// See https://omahaproxy.appspot.com for a list of current releases.
-	//
-	// Update this periodically.
-	desiredChromeBuild = "664981" // This corresponds to version 76.0.3809.0
+	// desiredFirefoxVersion is used when --download_latest is false.
+	// Update periodically.
+	desiredFirefoxVersion = "128.0.3"
 
-	// desiredFirefoxVersion is the known version of Firefox to download.
-	//
-	// Update this periodically.
-	desiredFirefoxVersion = "68.0.1"
+	// desiredSelenium3JAR is the Selenium 3 standalone server used by legacy tests.
+	desiredSelenium3JAR = "https://github.com/SeleniumHQ/selenium/releases/download/selenium-3.141.59/selenium-server-standalone-3.141.59.jar"
+
+	// chromeForTestingJSON is the Chrome for Testing last-known-good versions API.
+	chromeForTestingJSON = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"
 )
 
 var (
 	downloadBrowsers = flag.Bool("download_browsers", true, "If true, download the Firefox and Chrome browsers.")
-	downloadLatest   = flag.Bool("download_latest", false, "If true, download the latest versions.")
+	downloadLatest   = flag.Bool("download_latest", false, "If true, download the latest versions where available.")
+	httpClient       = &http.Client{Timeout: 5 * time.Minute}
 )
 
 type file struct {
@@ -58,25 +59,309 @@ type file struct {
 	browser  bool
 }
 
-var files = []file{
-	{
-		url:  "https://selenium-release.storage.googleapis.com/3.141/selenium-server-standalone-3.141.59.jar",
+var files []file
+
+func main() {
+	flag.Parse()
+	ctx := context.Background()
+
+	platform, err := detectPlatform()
+	if err != nil {
+		glog.Exitf("%v", err)
+	}
+	glog.Infof("Downloading assets for %s/%s (platform key %q)", runtime.GOOS, runtime.GOARCH, platform)
+
+	// Selenium 3 standalone (legacy integration tests).
+	files = append(files, file{
+		url:  desiredSelenium3JAR,
 		name: "selenium-server.jar",
-		// TODO(minusnine): reimplement hashing so that it is less annoying for maintenance.
-		// hash: "acf71b77d1b66b55db6fb0bed6d8bae2bbd481311bcbedfeff472c0d15e8f3cb",
-	},
-	{
-		url:    "https://saucelabs.com/downloads/sc-4.5.4-linux.tar.gz",
-		name:   "sauce-connect.tar.gz",
-		rename: []string{"sc-4.5.4-linux", "sauce-connect"},
-	},
+	})
+
+	if err := addSauceConnect(platform); err != nil {
+		glog.Errorf("Sauce Connect: %v", err)
+	}
+
+	if *downloadBrowsers {
+		if err := addChromeForTesting(platform, *downloadLatest); err != nil {
+			glog.Errorf("Chrome for Testing: %v", err)
+		}
+		if err := addFirefox(platform, desiredFirefoxVersion, *downloadLatest); err != nil {
+			glog.Errorf("Firefox: %v", err)
+		}
+	}
+
+	if err := addLatestGithubRelease(ctx, "SeleniumHQ", "htmlunit-driver", "htmlunit3?-driver-.*-jar-with-dependencies\\.jar", "htmlunit-driver.jar"); err != nil {
+		glog.Errorf("HTMLUnit Driver: %v", err)
+	}
+
+	geckoAsset, err := geckodriverAsset(platform)
+	if err != nil {
+		glog.Errorf("Geckodriver: %v", err)
+	} else if err := addLatestGithubRelease(ctx, "mozilla", "geckodriver", geckoAsset, geckodriverLocalName(platform)); err != nil {
+		glog.Errorf("Geckodriver: %v", err)
+	}
+
+	if *downloadLatest {
+		if err := addLatestGithubRelease(ctx, "SeleniumHQ", "selenium", `selenium-server-\d+\.\d+\.\d+\.jar`, "selenium-server-4.jar"); err != nil {
+			glog.Errorf("Selenium 4 server: %v", err)
+		}
+	}
+
+	var wg sync.WaitGroup
+	for _, f := range files {
+		wg.Add(1)
+		f := f
+		go func() {
+			defer wg.Done()
+			if err := handleFile(f); err != nil {
+				glog.Exitf("Error handling %s: %s", f.name, err)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func detectPlatform() (string, error) {
+	switch runtime.GOOS {
+	case "linux":
+		if runtime.GOARCH == "amd64" {
+			return "linux64", nil
+		}
+	case "darwin":
+		switch runtime.GOARCH {
+		case "amd64":
+			return "mac-x64", nil
+		case "arm64":
+			return "mac-arm64", nil
+		}
+	case "windows":
+		switch runtime.GOARCH {
+		case "amd64":
+			return "win64", nil
+		case "386":
+			return "win32", nil
+		}
+	}
+	return "", fmt.Errorf("unsupported GOOS/GOARCH %s/%s for browser asset downloads", runtime.GOOS, runtime.GOARCH)
+}
+
+func addChromeForTesting(platform string, latest bool) error {
+	// Always use last-known-good Stable; "latest" still means Stable tip (not Canary).
+	_ = latest
+	resp, err := httpClient.Get(chromeForTestingJSON)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("chrome-for-testing JSON HTTP %s", resp.Status)
+	}
+	var payload struct {
+		Channels map[string]struct {
+			Version   string `json:"version"`
+			Downloads struct {
+				Chrome       []struct{ Platform, URL string } `json:"chrome"`
+				Chromedriver []struct{ Platform, URL string } `json:"chromedriver"`
+			} `json:"downloads"`
+		} `json:"channels"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return err
+	}
+	stable, ok := payload.Channels["Stable"]
+	if !ok {
+		return fmt.Errorf("Stable channel missing from chrome-for-testing JSON")
+	}
+	chromeURL, err := findPlatformURL(stable.Downloads.Chrome, platform)
+	if err != nil {
+		return fmt.Errorf("chrome: %w", err)
+	}
+	driverURL, err := findPlatformURL(stable.Downloads.Chromedriver, platform)
+	if err != nil {
+		return fmt.Errorf("chromedriver: %w", err)
+	}
+	glog.Infof("Chrome for Testing Stable %s (%s)", stable.Version, platform)
+
+	chromeArchive := "chrome-" + platform + ".zip"
+	driverArchive := "chromedriver-" + platform + ".zip"
+	files = append(files,
+		file{
+			name:    chromeArchive,
+			url:     chromeURL,
+			browser: true,
+			rename:  chromeRename(platform),
+		},
+		file{
+			name:   driverArchive,
+			url:    driverURL,
+			rename: chromedriverRename(platform),
+		},
+	)
+	return nil
+}
+
+func findPlatformURL(items []struct{ Platform, URL string }, platform string) (string, error) {
+	for _, it := range items {
+		if it.Platform == platform {
+			return it.URL, nil
+		}
+	}
+	return "", fmt.Errorf("no download for platform %q", platform)
+}
+
+func chromeRename(platform string) []string {
+	// Keep linux path compatible with selenium_test.go default vendor/chrome-linux/chrome.
+	switch platform {
+	case "linux64":
+		return []string{"chrome-linux64", "chrome-linux"}
+	case "mac-x64":
+		return []string{"chrome-mac-x64", "chrome-mac"}
+	case "mac-arm64":
+		return []string{"chrome-mac-arm64", "chrome-mac"}
+	case "win64":
+		return []string{"chrome-win64", "chrome-win"}
+	case "win32":
+		return []string{"chrome-win32", "chrome-win"}
+	default:
+		return nil
+	}
+}
+
+func chromedriverRename(platform string) []string {
+	switch platform {
+	case "linux64":
+		return []string{"chromedriver-linux64/chromedriver", "chromedriver"}
+	case "mac-x64":
+		return []string{"chromedriver-mac-x64/chromedriver", "chromedriver"}
+	case "mac-arm64":
+		return []string{"chromedriver-mac-arm64/chromedriver", "chromedriver"}
+	case "win64":
+		return []string{"chromedriver-win64/chromedriver.exe", "chromedriver.exe"}
+	case "win32":
+		return []string{"chromedriver-win32/chromedriver.exe", "chromedriver.exe"}
+	default:
+		return nil
+	}
+}
+
+func addFirefox(platform, version string, latest bool) error {
+	// Browser packages: Linux is tar.bz2; Windows zip; macOS dmg is not auto-extracted here.
+	switch {
+	case latest && (platform == "linux64"):
+		files = append(files, file{
+			url:     "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US",
+			name:    "firefox.tar.bz2",
+			browser: true,
+		})
+		return nil
+	case platform == "linux64":
+		files = append(files, file{
+			url: "https://download-installer.cdn.mozilla.net/pub/firefox/releases/" +
+				url.PathEscape(version) + "/linux-x86_64/en-US/firefox-" + url.PathEscape(version) + ".tar.bz2",
+			name:    "firefox.tar.bz2",
+			browser: true,
+		})
+		return nil
+	case platform == "win64":
+		v := version
+		if latest {
+			// Product link resolves to latest; store as zip name for extraction.
+			files = append(files, file{
+				url:     "https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=en-US",
+				name:    "firefox-win64.exe",
+				browser: true,
+			})
+			glog.Warningf("Firefox Windows download is an installer (%s); extract/install manually if needed", v)
+			return nil
+		}
+		files = append(files, file{
+			url: "https://download-installer.cdn.mozilla.net/pub/firefox/releases/" +
+				url.PathEscape(version) + "/win64/en-US/Firefox%20Setup%20" + url.PathEscape(version) + ".exe",
+			name:    "firefox-win64.exe",
+			browser: true,
+		})
+		glog.Warningf("Firefox Windows asset is an installer; not auto-extracted")
+		return nil
+	case strings.HasPrefix(platform, "mac-"):
+		osLabel := "osx"
+		if latest {
+			files = append(files, file{
+				url:     "https://download.mozilla.org/?product=firefox-latest-ssl&os=" + osLabel + "&lang=en-US",
+				name:    "firefox.dmg",
+				browser: true,
+			})
+		} else {
+			files = append(files, file{
+				url: "https://download-installer.cdn.mozilla.net/pub/firefox/releases/" +
+					url.PathEscape(version) + "/mac/en-US/Firefox%20" + url.PathEscape(version) + ".dmg",
+				name:    "firefox.dmg",
+				browser: true,
+			})
+		}
+		glog.Warningf("Firefox macOS asset is a DMG; mount/extract manually if needed")
+		return nil
+	default:
+		return fmt.Errorf("firefox browser download not configured for %s", platform)
+	}
+}
+
+func geckodriverAsset(platform string) (string, error) {
+	switch platform {
+	case "linux64":
+		return `geckodriver-.*-linux64\.tar\.gz`, nil
+	case "mac-x64":
+		return `geckodriver-.*-macos\.tar\.gz`, nil
+	case "mac-arm64":
+		return `geckodriver-.*-macos-aarch64\.tar\.gz`, nil
+	case "win64":
+		return `geckodriver-.*-win64\.zip`, nil
+	case "win32":
+		return `geckodriver-.*-win32\.zip`, nil
+	default:
+		return "", fmt.Errorf("no geckodriver asset pattern for %s", platform)
+	}
+}
+
+func geckodriverLocalName(platform string) string {
+	if strings.HasPrefix(platform, "win") {
+		return "geckodriver.zip"
+	}
+	return "geckodriver.tar.gz"
+}
+
+func addSauceConnect(platform string) error {
+	// Sauce Connect 4.9.2 multi-OS packages.
+	const ver = "4.9.2"
+	switch platform {
+	case "linux64":
+		files = append(files, file{
+			url:    fmt.Sprintf("https://saucelabs.com/downloads/sc-%s-linux.tar.gz", ver),
+			name:   "sauce-connect.tar.gz",
+			rename: []string{fmt.Sprintf("sc-%s-linux", ver), "sauce-connect"},
+		})
+	case "mac-x64", "mac-arm64":
+		files = append(files, file{
+			url:    fmt.Sprintf("https://saucelabs.com/downloads/sc-%s-osx.zip", ver),
+			name:   "sauce-connect.zip",
+			rename: []string{fmt.Sprintf("sc-%s-osx", ver), "sauce-connect"},
+		})
+	case "win32", "win64":
+		files = append(files, file{
+			url:    fmt.Sprintf("https://saucelabs.com/downloads/sc-%s-win32.zip", ver),
+			name:   "sauce-connect.zip",
+			rename: []string{fmt.Sprintf("sc-%s-win32", ver), "sauce-connect"},
+		})
+	default:
+		return fmt.Errorf("no Sauce Connect package for %s", platform)
+	}
+	return nil
 }
 
 // addLatestGithubRelease adds a file to the list of files to download from the
 // latest release of the specified Github repository that matches the asset
 // name. The file will be downloaded to localFileName.
 func addLatestGithubRelease(ctx context.Context, owner, repo, assetName, localFileName string) error {
-	client := github.NewClient(nil)
+	client := github.NewClient(httpClient)
 
 	rel, _, err := client.Repositories.GetLatestRelease(ctx, owner, repo)
 	if err != nil {
@@ -101,129 +386,12 @@ func addLatestGithubRelease(ctx context.Context, owner, repo, assetName, localFi
 		return nil
 	}
 
-	return fmt.Errorf("Release for %s not found at http://github.com/%s/%s/releases", assetName, owner, repo)
-}
-
-// addChrome adds the appropriate chromium files to the list.
-//
-// If `latestChromeBuild` is empty, then the latest build will be used.
-// Otherwise, that specific build will be used.
-func addChrome(ctx context.Context, latestChromeBuild string) error {
-	const (
-		// Bucket URL: https://console.cloud.google.com/storage/browser/chromium-browser-continuous/?pli=1
-		storageBktName             = "chromium-browser-snapshots"
-		prefixLinux64              = "Linux_x64"
-		lastChangeFile             = "Linux_x64/LAST_CHANGE"
-		chromeFilename             = "chrome-linux.zip"
-		chromeDriverFilename       = "chromedriver_linux64.zip"
-		chromeDriverTargetFilename = "chromedriver.zip" // For backward compatibility
-	)
-	gcsPath := fmt.Sprintf("gs://%s/", storageBktName)
-	client, err := storage.NewClient(ctx, option.WithHTTPClient(http.DefaultClient))
-	if err != nil {
-		return fmt.Errorf("cannot create a storage client for downloading the chrome browser: %v", err)
-	}
-	bkt := client.Bucket(storageBktName)
-	if latestChromeBuild == "" {
-		r, err := bkt.Object(lastChangeFile).NewReader(ctx)
-		if err != nil {
-			return fmt.Errorf("cannot create a reader for %s%s file: %v", gcsPath, lastChangeFile, err)
-		}
-		defer r.Close()
-		// Read the last change file content for the latest build directory name
-		data, err := ioutil.ReadAll(r)
-		if err != nil {
-			return fmt.Errorf("cannot read from %s%s file: %v", gcsPath, lastChangeFile, err)
-		}
-		latestChromeBuild = string(data)
-	}
-	latestChromePackage := path.Join(prefixLinux64, latestChromeBuild, chromeFilename)
-	cpAttrs, err := bkt.Object(latestChromePackage).Attrs(ctx)
-	if err != nil {
-		return fmt.Errorf("cannot get the chrome package %s%s attrs: %v", gcsPath, latestChromePackage, err)
-	}
-	files = append(files, file{
-		name:    chromeFilename,
-		browser: true,
-		url:     cpAttrs.MediaLink,
-	})
-	latestChromeDriverPackage := path.Join(prefixLinux64, latestChromeBuild, chromeDriverFilename)
-	cpAttrs, err = bkt.Object(latestChromeDriverPackage).Attrs(ctx)
-	if err != nil {
-		return fmt.Errorf("cannot get the chrome driver package %s%s attrs: %v", gcsPath, latestChromeDriverPackage, err)
-	}
-	files = append(files, file{
-		name:   chromeDriverTargetFilename,
-		url:    cpAttrs.MediaLink,
-		rename: []string{"chromedriver_linux64/chromedriver", "chromedriver"},
-	})
-	return nil
-}
-
-// addFirefox adds the appropriate Firefox files to the list.
-//
-// If `desiredVersion` is empty, the the latest version will be used.
-// Otherwise, the specific version will be used.
-func addFirefox(desiredVersion string) {
-	if desiredVersion == "" {
-		files = append(files, file{
-			// This is a recent nightly. Update this path periodically.
-			url:     "https://download.mozilla.org/?product=firefox-nightly-latest-ssl&os=linux64&lang=en-US",
-			name:    "firefox-nightly.tar.bz2",
-			browser: true,
-		})
-	} else {
-		files = append(files, file{
-			// This is a recent nightly. Update this path periodically.
-			url:     "https://download-installer.cdn.mozilla.net/pub/firefox/releases/" + url.PathEscape(desiredVersion) + "/linux-x86_64/en-US/firefox-" + url.PathEscape(desiredVersion) + ".tar.bz2",
-			name:    "firefox.tar.bz2",
-			browser: true,
-		})
-	}
-}
-
-func main() {
-	flag.Parse()
-	ctx := context.Background()
-	if *downloadBrowsers {
-		chromeBuild := desiredChromeBuild
-		firefoxVersion := desiredFirefoxVersion
-		if *downloadLatest {
-			chromeBuild = ""
-			firefoxVersion = ""
-		}
-
-		if err := addChrome(ctx, chromeBuild); err != nil {
-			glog.Errorf("Unable to download Google Chrome browser: %v", err)
-		}
-		addFirefox(firefoxVersion)
-	}
-
-	if err := addLatestGithubRelease(ctx, "SeleniumHQ", "htmlunit-driver", "htmlunit-driver-.*-jar-with-dependencies.jar", "htmlunit-driver.jar"); err != nil {
-		glog.Errorf("Unable to find the latest HTMLUnit Driver: %s", err)
-	}
-
-	if err := addLatestGithubRelease(ctx, "mozilla", "geckodriver", "geckodriver-.*linux64.tar.gz", "geckodriver.tar.gz"); err != nil {
-		glog.Errorf("Unable to find the latest Geckodriver: %s", err)
-	}
-
-	var wg sync.WaitGroup
-	for _, file := range files {
-		wg.Add(1)
-		file := file
-		go func() {
-			if err := handleFile(file); err != nil {
-				glog.Exitf("Error handling %s: %s", file.name, err)
-			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
+	return fmt.Errorf("release asset %s not found at https://github.com/%s/%s/releases", assetName, owner, repo)
 }
 
 func handleFile(file file) error {
 	if file.browser && !*downloadBrowsers {
-		glog.Infof("Skipping %q because --download_browser is not set.", file.name)
+		glog.Infof("Skipping %q because --download_browsers is not set.", file.name)
 		return nil
 	}
 	if file.hash != "" && fileSameHash(file) {
@@ -235,28 +403,40 @@ func handleFile(file file) error {
 		}
 	}
 
-	switch path.Ext(file.name) {
-	case ".zip":
+	switch {
+	case strings.HasSuffix(file.name, ".zip"):
 		glog.Infof("Unzipping %q", file.name)
 		if err := exec.Command("unzip", "-o", file.name).Run(); err != nil {
-			return fmt.Errorf("Error unzipping %q: %v", file.name, err)
+			return fmt.Errorf("error unzipping %q: %v", file.name, err)
 		}
-	case ".gz":
-		glog.Infof("Unzipping %q", file.name)
+	case strings.HasSuffix(file.name, ".tar.gz") || strings.HasSuffix(file.name, ".tgz"):
+		glog.Infof("Extracting %q", file.name)
 		if err := exec.Command("tar", "-xzf", file.name).Run(); err != nil {
-			return fmt.Errorf("Error unzipping %q: %v", file.name, err)
+			return fmt.Errorf("error extracting %q: %v", file.name, err)
 		}
-	case ".bz2":
-		glog.Infof("Unzipping %q", file.name)
+	case strings.HasSuffix(file.name, ".bz2"):
+		glog.Infof("Extracting %q", file.name)
 		if err := exec.Command("tar", "-xjf", file.name).Run(); err != nil {
-			return fmt.Errorf("Error unzipping %q: %v", file.name, err)
+			return fmt.Errorf("error extracting %q: %v", file.name, err)
 		}
+	case strings.HasSuffix(file.name, ".dmg"), strings.HasSuffix(file.name, ".exe"):
+		glog.Infof("Skipping auto-extract for %q (install manually if required)", file.name)
 	}
+
 	if rename := file.rename; len(rename) == 2 {
 		glog.Infof("Renaming %q to %q", rename[0], rename[1])
 		os.RemoveAll(rename[1]) // Ignore error.
+		// If source is nested, ensure parent path exists for destination.
 		if err := os.Rename(rename[0], rename[1]); err != nil {
-			glog.Warningf("Error renaming %q to %q: %v", rename[0], rename[1], err)
+			// Fall back to moving a single file when directory layout differs slightly.
+			matches, _ := filepath.Glob(rename[0])
+			if len(matches) == 1 {
+				if err2 := os.Rename(matches[0], rename[1]); err2 != nil {
+					glog.Warningf("Error renaming %q to %q: %v", rename[0], rename[1], err)
+				}
+			} else {
+				glog.Warningf("Error renaming %q to %q: %v", rename[0], rename[1], err)
+			}
 		}
 	}
 	return nil
@@ -269,15 +449,18 @@ func downloadFile(file file) (err error) {
 	}
 	defer func() {
 		if closeErr := f.Close(); closeErr != nil && err == nil {
-			err = fmt.Errorf("error closing %q: %v", file.name, err)
+			err = fmt.Errorf("error closing %q: %v", file.name, closeErr)
 		}
 	}()
 
-	resp, err := http.Get(file.url)
+	resp, err := httpClient.Get(file.url)
 	if err != nil {
 		return fmt.Errorf("%s: error downloading %q: %v", file.name, file.url, err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s: download %q: HTTP %s", file.name, file.url, resp.Status)
+	}
 	if file.hash != "" {
 		var h hash.Hash
 		switch strings.ToLower(file.hashType) {
