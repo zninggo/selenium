@@ -150,26 +150,33 @@ func TestSmokeChrome(t *testing.T) {
 		t.Fatalf("FindElement(ByClassName, headline): %v", err)
 	}
 
-	// SendKeys (W3C text + value list).
+	// SendKeys (W3C text + value list). Focus first so headless Chrome accepts keys.
 	const typed = "smoke-ok"
+	if err := input.Click(); err != nil {
+		t.Fatalf("Click input: %v", err)
+	}
 	if err := input.Clear(); err != nil {
 		t.Fatalf("Clear: %v", err)
 	}
 	if err := input.SendKeys(typed); err != nil {
 		t.Fatalf("SendKeys: %v", err)
 	}
-	// Prefer value attribute; fall back to property for stubborn drivers.
-	got, err := input.GetAttribute("value")
+	// DOM property "value" is the reliable read-back (see testGetProperty).
+	got, err := input.GetProperty("value")
 	if err != nil || got != typed {
-		// small settle for slower headless CI machines
-		time.Sleep(200 * time.Millisecond)
-		got, err = input.GetAttribute("value")
+		time.Sleep(300 * time.Millisecond)
+		got, err = input.GetProperty("value")
 	}
 	if err != nil {
-		t.Fatalf("GetAttribute(value): %v", err)
+		t.Fatalf("GetProperty(value): %v", err)
 	}
 	if got != typed {
-		t.Fatalf("input value = %q, want %q", got, typed)
+		// Last resort: attribute (some builds only expose one of the two).
+		if attr, aerr := input.GetAttribute("value"); aerr == nil && attr == typed {
+			got = attr
+		} else {
+			t.Fatalf("input value = %q, want %q", got, typed)
+		}
 	}
 
 	// Cookie add without expiry/path zero-values breaking the remote end.
